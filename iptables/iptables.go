@@ -1,4 +1,4 @@
-package main
+package iptables
 
 import (
 	"fmt"
@@ -23,7 +23,4 @@ func (table IPTable) Load(tableName string) {
 	
 }
 
-func main() {
-
-}
 
