@@ -3,7 +3,7 @@ package iptables
 import (
 	"bufio"
 	"bytes"
-	"fmt"
+	//"fmt"
 	"regexp"
 	"log"
 	"sort"
@@ -31,7 +31,7 @@ type IPTableRow struct {
 	SpecSrcPort	int
 }
 
-func (table IPTable) Load(tableName string) {
+func (table *IPTable) Load(tableName string) {
 	table.Name = tableName
 	out, err := exec.Command("iptables", "-t", tableName, "-L").Output()
 	if err != nil {
@@ -49,14 +49,12 @@ func (table IPTable) Load(tableName string) {
 	chain = nil
 	for scanner.Scan() {
 		line := scanner.Text()
-		// fmt.Println(line)
 		r := chainLine.FindStringSubmatch(line)
 
 		if len(r) > 0 {
 			chainName := r[len(r)-1]
 			chain = table.AddChain(chainName)
-			scanner.Scan() // Just added a chain 
-			// fmt.Printf("%+v", chain)
+			scanner.Scan()
 		}
 
 		s := ruleLine.FindStringSubmatch(line)
@@ -82,16 +80,14 @@ func (table IPTable) Load(tableName string) {
 			}
 
 			chain.Rows = append([]IPTableRow{row}, chain.Rows...)
-			//chain.AddRow(row)
 		}
 
-		fmt.Printf("%+v\n", chain)
 	}
 
 }
 
-func (table IPTable) AddChain(chainName string) *IPTableChain {
-	chain := table.GetChain(chainName)
+func (table *IPTable) AddChain(chainName string) *IPTableChain {
+	chain := table.FindChain(chainName)
 	if chain != nil {
 		return chain
 	}
@@ -102,33 +98,46 @@ func (table IPTable) AddChain(chainName string) *IPTableChain {
 	return &newChain
 }
 
-func (table IPTable) GetChain(chainName string) *IPTableChain {
+func (table IPTable) FindChain(chainName string) *IPTableChain {
 	i := sort.Search(len(table.Chains), func(i int) bool { return table.Chains[i].Name == chainName })
-	if i == 0 {
+	if i < len(table.Chains) && table.Chains[i].Name == chainName {
+		return &table.Chains[i]
+	} else {
 		return nil
 	}
-	return &table.Chains[i]
+	return nil
 }
 
-func (table IPTable) AddRowToChain(chainName string, destIP string, destPort int, srcPort int) {
-	row := IPTableRow{}
-	row.SpecDestIP		= destIP
-	row.SpecDestPort	= destPort
-	row.SpecSrcPort		= srcPort
-
-	chain := table.GetChain(chainName)
+func (table IPTable) AddRowToChain(chainName string, row IPTableRow) *IPTableChain {
+	chain := table.FindChain(chainName)
 	chain.Rows = append([]IPTableRow{row}, chain.Rows...)
+	return chain
 }
 
-func (chain IPTableChain) AddRow(row IPTableRow) {
-	chain.Rows = append([]IPTableRow{row}, chain.Rows...)
-	fmt.Printf("%+v\n", chain)
+func (table IPTable) Commit() {
+	//currentTable := GetNATTable()
+
+}
+
+func (chain IPTableChain) FindRow(protocol string, srcAddr string, destAddr string, srcPort int, destPort int) *IPTableRow {
+	i := sort.Search(len(chain.Rows), func(i int) bool {
+		res :=	chain.Rows[i].Protocol == protocol &&
+			chain.Rows[i].SourceAddr == srcAddr &&
+			chain.Rows[i].SpecDestIP == destAddr &&
+			chain.Rows[i].SpecDestPort == destPort &&
+			chain.Rows[i].SpecSrcPort == srcPort
+		return res })
+
+	if i < len(chain.Rows) {
+		return &chain.Rows[i]
+	} else {
+		return nil
+	}
 }
 
 func NewNATTable() IPTable {
 	table := IPTable{}
 
-	// add PREROUTING chain
 	chain := IPTableChain{}
 	chain.Name = "PREROUTING"
 
