@@ -23,6 +23,9 @@ func TestLoad(t *testing.T) {
 	if i == 0 {
 		t.Errorf("Table does not have a PREROUTING chain")
 	}
+
+	Log(t, table.Dump())
+
 }
 
 func TestAddRow(t *testing.T) {
@@ -31,7 +34,7 @@ func TestAddRow(t *testing.T) {
 
 	row := IPTableRow{}
 	row.Target		= "DNAT"
-	row.Protocol		= "all"
+	row.Protocol		= "tcp"
 	row.SourceAddr	        = "10.10.10.0/24"
 	row.Destination		= "anywhere"
 	row.SpecDestIP		= "192.168.0.100"
@@ -53,26 +56,32 @@ func TestAddRow(t *testing.T) {
 	Log(t, fmt.Sprintf("%+v\n", storedRow))
 }
 
-/*
-row.SpecDestIP		= "192.168.0.100"
-
 func TestCommit(t *testing.T) {
 	table := &IPTable{}
 	table.Load("nat")
 
 	row := IPTableRow{}
 	row.Target		= "DNAT"
-	row.Protocol		= "all"
+	row.Protocol		= "tcp"
 	row.SourceAddr	        = "192.168.0.0/24"
 	row.Destination		= "anywhere"
 	row.SpecDestIP		= "192.168.0.100"
 	row.SpecDestPort	= 80
 	row.SpecSrcPort		= 8080
 
-	fmt.Printf("%+v", table)
-
 	table.AddRowToChain("PREROUTING", row)
 
-	fmt.Printf("%+v", table)
-	// table.Commit()
-}*/
+	table.Commit()
+
+	newTable := IPTable{}
+	newTable.Load("nat")
+
+	chain := newTable.FindChain("PREROUTING")
+	Log(t, chain.ToTable())
+	newRow := chain.FindRow(row.Protocol, row.SourceAddr, row.SpecDestIP, 
+		row.SpecSrcPort, row.SpecDestPort)
+
+	if newRow == nil {
+		t.Errorf("Couldn't find added row")
+	}
+}
