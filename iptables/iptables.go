@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"log"
-	"sort"
 	"os/exec"
 	"strconv"
 	"github.com/olekukonko/tablewriter"
@@ -179,16 +178,20 @@ func (table IPTable) Dump() string {
 }
 
 func (chain IPTableChain) FindRow(protocol string, srcAddr string, destAddr string, srcPort int, destPort int) *IPTableRow {
-	i := sort.Search(len(chain.Rows), func(i int) bool {
-		res :=	chain.Rows[i].Protocol == protocol &&
-			chain.Rows[i].SourceAddr == srcAddr &&
-			chain.Rows[i].SpecDestIP == destAddr &&
-			chain.Rows[i].SpecDestPort == destPort &&
-			chain.Rows[i].SpecSrcPort == srcPort
-		return res })
+	x := -1
+	for i := range chain.Rows {
+		chain := chain.Rows[i]
+		if chain.Protocol == protocol &&
+		   chain.SourceAddr == srcAddr &&
+		   chain.SpecDestIP == destAddr &&
+		   chain.SpecDestPort == destPort &&
+		   chain.SpecSrcPort == srcPort {
+			x = i
+		}
+	}
 
-	if i < len(chain.Rows) {
-		return &chain.Rows[i]
+	if x > -1  {
+		return &chain.Rows[x]
 	} else {
 		return nil
 	}
