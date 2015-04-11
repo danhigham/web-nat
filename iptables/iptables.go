@@ -22,6 +22,7 @@ type IPTableChain struct {
 }
 
 type IPTableRow struct {
+	Index		int
 	Target		string // DNAT?
 	Protocol	string
 	SourceAddr	string
@@ -44,6 +45,8 @@ func (row IPTableRow) ToArray() []string {
 
 func (table *IPTable) Load(tableName string) {
 	table.Name = tableName
+	table.Chains = []IPTableChain{}
+
 	out, err := exec.Command("iptables", "-t", tableName, "-L", "-n").Output()
 	if err != nil {
 		log.Fatal(err)
@@ -128,12 +131,13 @@ func (table *IPTable) FindChain(chainName string) *IPTableChain {
 
 func (table IPTable) AddRowToChain(chainName string, row IPTableRow) *IPTableChain {
 	chain := table.FindChain(chainName)
-	chain.Rows = append([]IPTableRow{row}, chain.Rows...)
+	chain.Rows = append(chain.Rows, row)
 	return chain
 }
 
 func (table IPTable) Commit() {
-	currentTable := GetNATTable()
+	currentTable := IPTable{}
+	currentTable.Load(table.Name)
 
 	//iterate throrugh chains and table rows
 	for c := range table.Chains {
@@ -151,16 +155,27 @@ func (table IPTable) Commit() {
 			}
 		}
 	}
-/*
+
 	for c := range currentTable.Chains {
 		chain := currentTable.Chains [c]
+
 		for r := range chain.Rows {
 			row := chain.Rows[r]
 
+			newChain := table.FindChain(chain.Name)
+			newRow := newChain.FindRow(row.Protocol, row.SourceAddr, row.SpecDestIP,
+				row.SpecSrcPort, row.SpecDestPort)
 
+			if newRow == nil {
+				cmd := exec.Command("iptables", "-t", table.Name, "-D", chain.Name, strconv.Itoa(r + 1))
+				err := cmd.Run()
+				if err != nil {
+					log.Fatal(err)
+				}
+			}
 		}
 	}
-*/
+
 }
 
 func (table IPTable) Dump() string {
@@ -169,7 +184,7 @@ func (table IPTable) Dump() string {
 
 	for _, c := range table.Chains {
 		if len(c.Rows) > 0 {
-			fmt.Fprintf(w, "\n=== %s ===\n%s", c.Name, c.ToTable())
+			fmt.Fprintf(w, "\n---=== %s ===---\n%s", c.Name, c.ToTable())
 		}
 	}
 
@@ -191,7 +206,9 @@ func (chain IPTableChain) FindRow(protocol string, srcAddr string, destAddr stri
 	}
 
 	if x > -1  {
-		return &chain.Rows[x]
+		row := &chain.Rows[x]
+		row.Index = x
+		return row
 	} else {
 		return nil
 	}
@@ -216,7 +233,10 @@ func (chain IPTableChain) ToTable() string {
 func (row IPTableRow) Commit(tableName string, chainName string) {
 	var cmd *exec.Cmd
 
-	if row.SourceAddr == "" {
+	if row.SpecDestIP == "" && row.SpecDestPort == 0 && row.SpecSrcPort == 0 {
+		cmd = exec.Command("iptables", "-t", tableName, "-A", chainName, "-j", row.Target, "-p", row.Protocol)
+		// iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+	} else if row.SourceAddr == "" {
 		// iptables -t nat -A PREROUTING -p tcp --dport 1111 -j DNAT --to-destination 2.2.2.2:1111
 		cmd = exec.Command("iptables", "-t", tableName, "-A", chainName,
 			"-p", row.Protocol, "--dport", strconv.Itoa(row.SpecSrcPort), "-j", "DNAT",
@@ -231,20 +251,11 @@ func (row IPTableRow) Commit(tableName string, chainName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func (row IPTableRow) Remove(tableName string, chainName string) {
 
 }
 
-func NewNATTable() IPTable {
-	table := IPTable{}
-
-	chain := IPTableChain{}
-	chain.Name = "PREROUTING"
-
-	table.Chains = append([]IPTableChain{chain}, table.Chains...)
-	return table
+func (chain *IPTableChain) RemoveRow(i int) {
+	chain.Rows = append(chain.Rows[:i], chain.Rows[i+1:]...)
 }
 
 func GetNATTable() IPTable {

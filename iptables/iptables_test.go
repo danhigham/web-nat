@@ -2,7 +2,6 @@ package iptables
 
 import (
 	"testing"
-	"sort"
 	"fmt"
 )
 
@@ -18,11 +17,6 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Table name not set correctly, it is %s", table.Name)
 	}
 	Log(t, fmt.Sprintf("Table name is %s", table.Name))
-
-	i := sort.Search(len(table.Chains), func(i int) bool { return table.Chains[i].Name == "PREROUTING" })
-	if i == 0 {
-		t.Errorf("Table does not have a PREROUTING chain")
-	}
 
 	Log(t, table.Dump())
 
@@ -78,10 +72,52 @@ func TestCommit(t *testing.T) {
 
 	chain := newTable.FindChain("PREROUTING")
 	Log(t, chain.ToTable())
-	newRow := chain.FindRow(row.Protocol, row.SourceAddr, row.SpecDestIP, 
+	newRow := chain.FindRow(row.Protocol, row.SourceAddr, row.SpecDestIP,
 		row.SpecSrcPort, row.SpecDestPort)
 
 	if newRow == nil {
 		t.Errorf("Couldn't find added row")
 	}
+
+	chain.RemoveRow(newRow.Index)
+	newTable.Commit()
+
+	oldRow := chain.FindRow(row.Protocol, row.SourceAddr, row.SpecDestIP,
+		row.SpecSrcPort, row.SpecDestPort)
+
+	if oldRow != nil {
+		t.Errorf("Old row still exists in table")
+	}
+}
+
+func TestAddMasqueradeRule(t *testing.T){
+	table := &IPTable{}
+	table.Load("nat")
+
+	chain := table.FindChain("POSTROUTING")
+	if len(chain.Rows) > 0 {
+		chain.RemoveRow(0)
+		table.Commit()
+	}
+
+	if len(chain.Rows) > 0 {
+		t.Errorf("Couldn't remove row")
+	}
+
+	chainLen := len(chain.Rows)
+
+	row := IPTableRow{}
+	row.Target = "MASQUERADE"
+	row.Protocol = "all"
+	row.SourceAddr = "anywhere"
+	row.Destination = "anywhere"
+
+	table.AddRowToChain("POSTROUTING", row)
+	table.Commit()
+
+	if len(chain.Rows) <= chainLen {
+		t.Errorf("Couldn't add masqerade row back")
+	}
+
+	Log(t, chain.ToTable())
 }
