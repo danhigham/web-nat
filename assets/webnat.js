@@ -52,8 +52,12 @@ svg.call(zoom);
 
 var render = new dagreD3.render();
 
-var g = new dagreD3.graphlib.Graph();
+var g = new dagreD3.graphlib.Graph({
+    compound: true,
+    mulitgraph: false
+});
 g.setGraph({
+    edgesep: 25,
     nodesep: 70,
     ranksep: 50,
     rankdir: "LR",
@@ -66,6 +70,10 @@ var containers = [
 { id: "Minecraft Server", host: "host 2", port_nat: [ { container_port: 1234, port: 1234, from: "anywhere"} ] },
 { id: "MySQL", host: "host 1", port_nat: [ { container_port: 3306, port: 3306, from: "192.168.3.0/24"} ] }
 ];
+
+var uniqSources = _.uniq(_.flatten(_.map(containers, function(c) { return _.map(c.port_nat, function (p) { return p.from }) }) ));
+var sources = _.flatten(_.map(containers, function(c) { return _.map(c.port_nat, function (p) { return p; }) }) );
+var hosts = _.uniq(_.map(containers, function(c) { return c.host }));
 
 function htmlNode(caption, subtext, className) {
     var res;
@@ -82,8 +90,8 @@ function htmlNode(caption, subtext, className) {
 }
 
 function draw(isUpdate) {
+    
     // add NAT box
-    //
     var html = htmlNode("NAT", "NAT vm", "nat");
     console.log(html);
     g.setNode("nat-box", {
@@ -94,6 +102,31 @@ function draw(isUpdate) {
         padding: 0
         //class: "nat-box"
     });
+
+    for (var id in hosts) {
+        var host = hosts[id];
+        g.setNode(host, { 
+            label: host, 
+            labelType: "html",
+            rx: 5, 
+            ry: 5, 
+            width: 80 
+        });
+    }
+
+    for (var id in uniqSources) {
+        var source = uniqSources[id]
+        var html = htmlNode(source, source, "source");
+
+        g.setNode("src_" + source, {
+            labelType: "html",
+            label: html,
+            rx: 5,
+            ry: 5,
+            padding: 0
+        });
+    
+    }
 
     for (var id in containers) {
         var container = containers[id]        
@@ -108,10 +141,17 @@ function draw(isUpdate) {
             // class: className
         });
 
+        g.setParent(id, container.host);
+
         if (container.port_nat) {
             _.each(container.port_nat, function(nat) {
                 g.setEdge("nat-box", id, {
                     label: nat.port,
+                    width: 40
+                });
+
+                g.setEdge("src_" + nat.from, "nat-box", {
+                    label: nat.container_port,
                     width: 40
                 });
             });
