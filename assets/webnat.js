@@ -47,26 +47,24 @@ $( document ).ready(function () {
     // load data and then draw
     //
     async.parallel([
-            function(callback) {
-                $.getJSON("/shipyard_containers", function(data) {
-                    callback(null, data);
-                });
-            },
-            function(callback) {
-                $.getJSON("/ip_table", function(data) {
-                    callback(null, data); 
-                });
-            }
-            ],
-            function (err, results) {
-
-                context = {
-                    containers: results[0],
-        ipTable: results[1]
-                };
-
-                drawGraph(context);
+        function(callback) {
+            $.getJSON("/shipyard_containers", function(data) {
+                callback(null, data);
             });
+        },
+        function(callback) {
+            $.getJSON("/ip_table", function(data) {
+                callback(null, data); 
+            });
+        }],
+    function (err, results) {
+        context = {
+            containers: results[0],
+            ipTable: results[1]
+        };
+
+        drawGraph(context);
+    });
 
     function drawGraph(graphContext) {
         

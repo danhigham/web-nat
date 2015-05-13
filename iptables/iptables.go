@@ -12,24 +12,24 @@ import (
 )
 
 type IPTable struct {
-	Name	string
-	Chains	[]IPTableChain
+	Name	string			`json:"name"`
+	Chains	[]IPTableChain  `json:"chains"`
 }
 
 type IPTableChain struct {
-	Name	string
-	Rows	[]IPTableRow
+	Name	string			`json:"name"`
+	Rows	[]IPTableRow	`json:"rows"`
 }
 
 type IPTableRow struct {
-	Index		int
-	Target		string // DNAT?
-	Protocol	string
-	SourceAddr	string
-	Destination	string
-	SpecDestIP	string
-	SpecDestPort	int
-	SpecSrcPort	int
+	Index		int			`json:"index"`
+	Target		string		`json:"target"`
+	Protocol	string		`json:"protocol"`
+	SourceAddr	string		`json:"source_address"`
+	Destination	string		`json:"destination"`
+	SpecDestIP	string		`json:"spec_destination_ip"`
+	SpecDestPort	int		`json:"spec_destination_port"`
+	SpecSrcPort	int			`json:"spec_source_port"`
 }
 
 func (row IPTableRow) ToArray() []string {
